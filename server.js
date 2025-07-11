@@ -64,6 +64,10 @@ app.post('/decrypt', upload.single('file'), async (req, res) => {
     }
 });
 
+app.get('/', (req, res) => {
+  res.send('✅ PDF Decryptor Service is running. Use POST /decrypt');
+});
+
 app.listen(port, () => {
     console.log(`✅ PDF Decryption server listening on port ${port}`);
 });
