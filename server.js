@@ -15,11 +15,12 @@ app.post('/decrypt', upload.single('pdf'), (req, res) => {
   const inputPath = req.file.path;
   const outputFile = tmp.tmpNameSync({ postfix: '.pdf' });
 
-  const cmd = `qpdf --password=${password} --decrypt ${inputPath} ${outputFile}`;
-  exec(cmd, (error) => {
-    if (error) {
-      return res.status(500).json({ error: 'Decryption failed', details: error.message });
-    }
+  const cmd = `qpdf --password="${password}" --decrypt "${inputPath}" "${outputFile}"`;
+ exec(cmd, (error, stdout, stderr) => {
+  if (error) {
+    console.error('QPDF Error:', stderr);
+    return res.status(500).json({ error: 'Decryption failed', details: stderr });
+  }
 
     res.download(outputFile, 'decrypted.pdf', (err) => {
       fs.unlinkSync(inputPath);
