@@ -15,8 +15,11 @@ app.post('/decrypt', upload.single('pdf'), (req, res) => {
   const inputPath = req.file.path;
   const outputFile = tmp.tmpNameSync({ postfix: '.pdf' });
 
-  console.log("🔐 Received password:", password);
+console.log("🔐 Received password:", password);
   console.log("📄 Uploaded file path:", inputPath);
+  console.log("🧾 File original name:", req.file.originalname);
+  console.log("🧾 File mimetype:", req.file.mimetype);
+  console.log("📏 File size:", req.file.size, "bytes");
   console.log("🔧 Decryption target output path:", outputFile);
 
   // Optional: Inspect PDF encryption settings
