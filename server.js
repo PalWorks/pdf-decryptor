@@ -25,7 +25,7 @@ const log = (msg) => {
 
 // Root endpoint message
 app.get('/', (req, res) => {
-  res.send('🛡️ PDF Decryptor Service is up and running. Use POST /decrypt with file and password.');
+  res.send('👋 Welcome to the PDF Decryptor Service! Use /decrypt or /decrypt-base64 to POST your file and password.');
 });
 
 // Decrypt endpoint
