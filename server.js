@@ -88,6 +88,53 @@ app.post('/decrypt', upload.single('file'), async (req, res) => {
   }
 });
 
+// Separate route for strict JSON-only Base64 decryption
+app.post('/decrypt-base64', async (req, res) => {
+  try {
+    const { pdfBase64, password } = req.body;
+    if (!pdfBase64 || !password) {
+      return res.status(400).json({ error: 'Missing pdfBase64 or password in request body.' });
+    }
+
+    log('📥 /decrypt-base64: Base64 input received.');
+    const cleanBase64 = pdfBase64.replace(/^data:application\/pdf;base64,/, '');
+    const pdfPath = `uploads/${Date.now()}_base64input.pdf`;
+    const tmpOutputPath = `/tmp/tmp-${Date.now()}-base64-decrypted.pdf`;
+
+    fs.writeFileSync(pdfPath, Buffer.from(cleanBase64, 'base64'));
+
+    log(`🔐 Received password: ${password}`);
+    log(`📄 Base64 PDF saved at: ${pdfPath}`);
+    log(`🔧 Decryption output path: ${tmpOutputPath}`);
+
+    const infoCmd = `qpdf --show-encryption '${pdfPath}'`;
+    exec(infoCmd, (infoErr, infoStdout, infoStderr) => {
+      log('🔍 PDF encryption info (Base64 route):');
+      if (infoErr) log(`Info Error: ${infoErr.message}`);
+      log(infoStdout || infoStderr);
+
+      const decryptCmd = `qpdf --password='${password}' --decrypt '${pdfPath}' '${tmpOutputPath}'`;
+      exec(decryptCmd, (err, stdout, stderr) => {
+        if (err) {
+          const details = stderr || err.message;
+          log(`❌ QPDF Decrypt Error (Base64 route): ${details}`);
+          return res.status(500).json({ error: 'Decryption failed', details });
+        }
+
+        log('✅ Decryption successful (Base64 route).');
+        const decryptedBase64 = fs.readFileSync(tmpOutputPath, { encoding: 'base64' });
+        res.json({ success: true, decryptedBase64 });
+      });
+    });
+  } catch (error) {
+    log(`🚨 Uncaught Error (Base64 route): ${error.message}`);
+    res.status(500).json({
+      error: 'Unexpected error occurred',
+      details: error.message
+    });
+  }
+});
+
 app.listen(port, () => {
   log(`🚀 Server is listening on port ${port}`);
 });
