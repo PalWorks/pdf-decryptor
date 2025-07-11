@@ -1,99 +1,93 @@
 const express = require('express');
 const multer = require('multer');
 const fs = require('fs');
-const path = require('path');
 const { exec } = require('child_process');
-
+const path = require('path');
 const app = express();
 const port = process.env.PORT || 10000;
 
+// Middleware to handle JSON and urlencoded requests
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-const uploadDir = 'uploads';
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
-}
-
+// Storage setup for multer
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+  destination: (req, file, cb) => cb(null, 'uploads/'),
+  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
 });
-
 const upload = multer({ storage });
 
+// Helper function for logging with timestamp
+const log = (msg) => {
+  const time = new Date().toISOString();
+  console.log(`[${time}] ${msg}`);
+};
+
+// Root endpoint message
 app.get('/', (req, res) => {
-  res.send('👋 Welcome! Use POST /decrypt for binary or /decrypt-base64 for base64 input.');
+  res.send('🛡️ PDF Decryptor Service is up and running. Use POST /decrypt with file and password.');
 });
 
-app.post('/decrypt', upload.single('pdf'), (req, res) => {
-  const password = req.body.password;
-  const inputPath = req.file.path;
-  const outputPath = path.join('/tmp', `decrypted-${Date.now()}.pdf`);
+// Decrypt endpoint
+app.post('/decrypt', upload.single('file'), async (req, res) => {
+  try {
+    let pdfPath = '';
+    let password = '';
+    const tmpOutputPath = `/tmp/tmp-${Date.now()}.pdf`;
 
-  console.log(`🔐 Received password: ${password}`);
-  console.log(`📄 Uploaded file path: ${inputPath}`);
-  console.log(`🔧 Decryption target output path: ${outputPath}`);
-
-  const cmd = `qpdf --show-encryption ${inputPath}`;
-  exec(cmd, (err, stdout, stderr) => {
-    console.log('🔍 PDF encryption info:
-' + stdout);
-    if (stderr) console.error(stderr);
-  });
-
-  exec(`qpdf --password=${password} --decrypt ${inputPath} ${outputPath}`, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`❌ QPDF Error: ${stderr}`);
-      return res.status(500).json({
-        error: 'Decryption failed',
-        details: stderr,
-      });
+    if (req.body.pdfBase64 && req.body.password) {
+      log('📥 Base64 input received.');
+      const base64Data = req.body.pdfBase64.replace(/^data:application\/pdf;base64,/, '');
+      password = req.body.password;
+      pdfPath = `uploads/${Date.now()}.pdf`;
+      fs.writeFileSync(pdfPath, Buffer.from(base64Data, 'base64'));
+    } else if (req.file && req.body.password) {
+      log('📥 Binary file received.');
+      pdfPath = req.file.path;
+      password = req.body.password;
+    } else {
+      return res.status(400).json({ error: 'Missing file or password' });
     }
 
-    const decryptedFile = fs.readFileSync(outputPath);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.send(decryptedFile);
+    log(`🔐 Received password: ${password}`);
+    log(`📄 Uploaded file path: ${pdfPath}`);
+    log(`🔧 Decryption target output path: ${tmpOutputPath}`);
 
-    fs.unlink(inputPath, () => {});
-    fs.unlink(outputPath, () => {});
-  });
-});
+    // Debug command to analyze PDF encryption
+    const infoCmd = `qpdf --show-encryption ${pdfPath}`;
+    exec(infoCmd, (infoErr, infoStdout, infoStderr) => {
+      log('🔍 PDF encryption info:');
+      if (infoErr) {
+        log(`Error checking encryption: ${infoErr.message}`);
+      }
+      log(infoStdout || infoStderr);
 
-app.post('/decrypt-base64', (req, res) => {
-  const { pdfBase64, password } = req.body;
+      // Actual decryption command
+      const decryptCmd = `qpdf --password='${password}' --decrypt '${pdfPath}' '${tmpOutputPath}'`;
+      exec(decryptCmd, (err, stdout, stderr) => {
+        if (err) {
+          const details = stderr || err.message;
+          log(`❌ QPDF Error: ${details}`);
+          return res.status(500).json({
+            error: 'Decryption failed',
+            details
+          });
+        }
 
-  if (!pdfBase64 || !password) {
-    return res.status(400).json({ error: 'Missing pdfBase64 or password field' });
+        log('✅ Decryption successful.');
+        const decryptedBase64 = fs.readFileSync(tmpOutputPath, { encoding: 'base64' });
+        res.json({ success: true, decryptedBase64 });
+      });
+    });
+  } catch (error) {
+    log(`🚨 Uncaught Error: ${error.message}`);
+    res.status(500).json({
+      error: 'Unexpected error occurred',
+      details: error.message
+    });
   }
-
-  const binary = Buffer.from(pdfBase64, 'base64');
-  const inputPath = path.join(uploadDir, `${Date.now()}-base64.pdf`);
-  const outputPath = path.join('/tmp', `decrypted-${Date.now()}.pdf`);
-
-  fs.writeFileSync(inputPath, binary);
-  console.log(`🔐 Received password: ${password}`);
-  console.log(`📄 Saved base64 PDF path: ${inputPath}`);
-  console.log(`🔧 Decryption target output path: ${outputPath}`);
-
-  exec(`qpdf --password=${password} --decrypt ${inputPath} ${outputPath}`, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`❌ QPDF Error: ${stderr}`);
-      return res.status(500).json({
-        error: 'Decryption failed',
-        details: stderr,
-      });
-    }
-
-    const decryptedFile = fs.readFileSync(outputPath);
-    const base64Decrypted = decryptedFile.toString('base64');
-    res.json({ decryptedPdfBase64: base64Decrypted });
-
-    fs.unlink(inputPath, () => {});
-    fs.unlink(outputPath, () => {});
-  });
 });
 
 app.listen(port, () => {
-  console.log(`✅ PDF Decryption server listening on port ${port}`);
+  log(`🚀 Server is listening on port ${port}`);
 });
