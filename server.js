@@ -1,59 +1,80 @@
-const express = require('express');
-const multer = require('multer');
-const fs = require('fs');
-const path = require('path');
-const { exec } = require('child_process');
-const tmp = require('tmp');
+const express = require("express");
+const fs = require("fs");
+const path = require("path");
+const { exec } = require("child_process");
+const { v4: uuidv4 } = require("uuid");
+const bodyParser = require("body-parser");
 
 const app = express();
-const upload = multer({ dest: 'uploads/' });
+const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
+app.use(bodyParser.json({ limit: "25mb" }));
 
-app.post('/decrypt', upload.single('pdf'), (req, res) => {
-  const password = req.body.password;
-  const inputPath = req.file.path;
-  const outputFile = tmp.tmpNameSync({ postfix: '.pdf' });
+app.post("/decrypt", async (req, res) => {
+  try {
+    const { pdfBase64, password } = req.body;
 
-console.log("🔐 Received password:", password);
-  console.log("📄 Uploaded file path:", inputPath);
-  console.log("🧾 File original name:", req.file.originalname);
-  console.log("🧾 File mimetype:", req.file.mimetype);
-  console.log("📏 File size:", req.file.size, "bytes");
-  console.log("🔧 Decryption target output path:", outputFile);
+    console.log("📥 Incoming request received");
+    console.log("📝 Request size:", JSON.stringify(req.body).length, "chars");
 
-  // Optional: Inspect PDF encryption settings
-  const inspectCmd = `qpdf --show-encryption "${inputPath}"`;
-  exec(inspectCmd, (inspectErr, inspectOut, inspectStderr) => {
-    console.log("🔍 PDF encryption info:");
-    console.log(inspectOut || inspectStderr);
+    if (!pdfBase64 || !password) {
+      console.warn("⚠️ Missing required fields: pdfBase64 or password");
+      return res.status(400).json({ error: "Missing pdfBase64 or password" });
+    }
 
-    // Proceed to decryption
-    const decryptCmd = `qpdf --password="${password}" --decrypt "${inputPath}" "${outputFile}"`;
-    exec(decryptCmd, (error, stdout, stderr) => {
+    const uploadId = uuidv4();
+    const encryptedFilePath = path.join("uploads", `${uploadId}.pdf`);
+    const decryptedFilePath = path.join("/tmp", `decrypted-${uploadId}.pdf`);
+
+    try {
+      fs.writeFileSync(encryptedFilePath, Buffer.from(pdfBase64, "base64"));
+      console.log("📄 Base64 PDF saved to:", encryptedFilePath);
+    } catch (fileErr) {
+      console.error("❌ Failed to write encrypted file:", fileErr.message);
+      return res.status(500).json({ error: "Failed to save file" });
+    }
+
+    console.log("🔐 Received password:", password);
+    console.log("🔧 Decryption output path:", decryptedFilePath);
+
+    const decryptCommand = `qpdf --password=${password} --decrypt "${encryptedFilePath}" "${decryptedFilePath}"`;
+    console.log("🛠️ Running command:", decryptCommand);
+
+    exec(decryptCommand, (error, stdout, stderr) => {
       if (error) {
-        console.error("❌ QPDF Error:", stderr);
+        console.error("❌ Decryption failed:");
+        console.error(stderr);
         return res.status(500).json({
           error: "Decryption failed",
-          details: stderr || error.message
+          stderr: stderr.toString(),
         });
       }
 
-      res.download(outputFile, 'decrypted.pdf', (err) => {
-        fs.unlinkSync(inputPath);
-        fs.unlinkSync(outputFile);
-        if (err) {
-          console.error("Download error:", err);
-        }
+      console.log("✅ Decryption command stdout:");
+      console.log(stdout);
+
+      let decryptedBuffer;
+      try {
+        decryptedBuffer = fs.readFileSync(decryptedFilePath);
+      } catch (readErr) {
+        console.error("❌ Could not read decrypted file:", readErr.message);
+        return res.status(500).json({ error: "Decryption succeeded but file read failed" });
+      }
+
+      const decryptedBase64 = decryptedBuffer.toString("base64");
+
+      res.json({
+        message: "Decryption successful",
+        decryptedPdfBase64: decryptedBase64,
       });
     });
-  });
+  } catch (err) {
+    console.error("🚨 Unexpected error:");
+    console.error(err.stack || err.message);
+    res.status(500).json({ error: "Unexpected server error", details: err.message });
+  }
 });
 
-app.get('/', (req, res) => {
-  res.send('PDF Decryptor Service is running.');
-});
-
-app.listen(3000, () => {
-  console.log('✅ Server listening on port 3000');
+app.listen(PORT, () => {
+  console.log(`🚀 PDF Decryptor server running on port ${PORT}`);
 });
