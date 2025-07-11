@@ -44,13 +44,13 @@ app.post('/decrypt', upload.single('file'), async (req, res) => {
         log('QPDF Command', command);
 
         exec(command, (error, stdout, stderr) => {
-            if (error) {
-                console.error('❌ QPDF Error:', stderr || stdout || error);
-                return res.status(500).json({
-                    error: 'Decryption failed',
-                    details: stderr || error.message || stdout
-                });
-            }
+     if (error && error.code !== 0) {
+  console.error('❌ QPDF Error:', stderr || stdout || error);
+  return res.status(500).json({
+    error: 'Decryption failed',
+    details: stderr || error.message || stdout
+  });
+}
 
             const decryptedFile = fs.readFileSync(outputFilePath);
             const base64 = decryptedFile.toString('base64');
