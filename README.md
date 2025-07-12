@@ -16,7 +16,7 @@ This is a simple Express.js microservice that uses `qpdf` to decrypt password-pr
 ## 📁 Folder Structure
 
 ```
-pdf-decryptor/
+pdf-decryptor-service/
 ├── Dockerfile         # Builds the image with qpdf installed
 ├── package.json       # Node.js dependencies and metadata
 └── server.js          # Express server with `/decrypt` endpoint
@@ -78,7 +78,7 @@ node server.js
 Then, in another terminal:
 
 ```bash
-curl -X POST http://localhost:10000/decrypt   -F "pdf=@path/to/locked.pdf"   -F "password=YOUR_PASSWORD" --output decrypted.pdf
+curl -X POST http://localhost:10000/decrypt   -F "file=@path/to/locked.pdf"   -F "password=YOUR_PASSWORD" --output decrypted.pdf
 ```
 
 ---

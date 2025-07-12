@@ -3,8 +3,10 @@ const multer = require('multer');
 const fs = require('fs');
 const { exec } = require('child_process');
 const path = require('path');
-const os = require('os');
-const uploadsDir = os.tmpdir();
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
 const app = express();
 const port = process.env.PORT || 10000;
 
@@ -151,6 +153,10 @@ app.post('/decrypt-base64', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  log(`🚀 Server is listening on port ${port}`);
-});
+if (require.main === module) {
+  app.listen(port, () => {
+    log(`🚀 Server is listening on port ${port}`);
+  });
+}
+
+module.exports = app;
