@@ -70,9 +70,9 @@ app.post('/decrypt', upload.single('file'), async (req, res) => {
       log(infoStdout || infoStderr);
 
       // Actual decryption command
-      const decryptCmd = `qpdf --password='${password}' --decrypt '${pdfPath}' '${tmpOutputPath}'`;
+      const decryptCmd = `qpdf --warning-exit-0 --password='${password}' --decrypt '${pdfPath}' '${tmpOutputPath}'`;
       exec(decryptCmd, (err, stdout, stderr) => {
-        if (err) {
+        if (err && err.code !== 3) {
           const details = stderr || err.message;
           log(`❌ QPDF Error: ${details}`);
           cleanup();
@@ -127,9 +127,9 @@ app.post('/decrypt-base64', async (req, res) => {
       if (infoErr) log(`Info Error: ${infoErr.message}`);
       log(infoStdout || infoStderr);
 
-      const decryptCmd = `qpdf --password='${password}' --decrypt '${pdfPath}' '${tmpOutputPath}'`;
+      const decryptCmd = `qpdf --warning-exit-0 --password='${password}' --decrypt '${pdfPath}' '${tmpOutputPath}'`;
       exec(decryptCmd, (err, stdout, stderr) => {
-        if (err) {
+        if (err && err.code !== 3) {
           const details = stderr || err.message;
           log(`❌ QPDF Decrypt Error (Base64 route): ${details}`);
           cleanup();
