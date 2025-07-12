@@ -41,7 +41,7 @@ cd pdf-decryptor-service
 4. Use this repo
 5. Select:
    - **Environment**: Docker
-   - **Port**: 3000
+   - **Port**: 10000
    - Leave the rest as defaults
 6. Click **Deploy**
 
@@ -78,7 +78,7 @@ node server.js
 Then, in another terminal:
 
 ```bash
-curl -X POST http://localhost:3000/decrypt   -F "pdf=@path/to/locked.pdf"   -F "password=YOUR_PASSWORD" --output decrypted.pdf
+curl -X POST http://localhost:10000/decrypt   -F "pdf=@path/to/locked.pdf"   -F "password=YOUR_PASSWORD" --output decrypted.pdf
 ```
 
 ---

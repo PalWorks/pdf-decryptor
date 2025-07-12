@@ -13,5 +13,5 @@ RUN npm install
 # Copy app source
 COPY . .
 
-EXPOSE 3000
+EXPOSE 10000
 CMD [ "node", "server.js" ]
