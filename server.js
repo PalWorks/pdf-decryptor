@@ -1,6 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const fs = require('fs');
+const fsPromises = fs.promises;
 const { exec } = require('child_process');
 const path = require('path');
 const os = require('os');
@@ -47,7 +48,7 @@ app.post('/decrypt', upload.single('file'), async (req, res) => {
       const base64Data = req.body.pdfBase64.replace(/^data:application\/pdf;base64,/, '');
       password = req.body.password;
       pdfPath = path.join(uploadsDir, `${Date.now()}.pdf`);
-      fs.writeFileSync(pdfPath, Buffer.from(base64Data, 'base64'));
+      await fsPromises.writeFile(pdfPath, Buffer.from(base64Data, 'base64'));
     } else if (req.file && req.body.password) {
       log('📥 Binary file received.');
       pdfPath = req.file.path;
@@ -72,7 +73,7 @@ app.post('/decrypt', upload.single('file'), async (req, res) => {
 
       // Actual decryption command
       const decryptCmd = `qpdf --warning-exit-0 --password='${password}' --decrypt '${pdfPath}' '${tmpOutputPath}'`;
-      exec(decryptCmd, (err, stdout, stderr) => {
+      exec(decryptCmd, async (err, stdout, stderr) => {
         if (err && err.code !== 3) {
           const details = stderr || err.message;
           log(`❌ QPDF Error: ${details}`);
@@ -84,7 +85,7 @@ app.post('/decrypt', upload.single('file'), async (req, res) => {
         }
 
         log('✅ Decryption successful.');
-        const decryptedBase64 = fs.readFileSync(tmpOutputPath, { encoding: 'base64' });
+        const decryptedBase64 = await fsPromises.readFile(tmpOutputPath, { encoding: 'base64' });
         res.json({ success: true, decryptedBase64 });
         cleanup();
       });
@@ -116,7 +117,7 @@ app.post('/decrypt-base64', async (req, res) => {
       fs.unlink(tmpOutputPath, () => {});
     };
 
-    fs.writeFileSync(pdfPath, Buffer.from(cleanBase64, 'base64'));
+    await fsPromises.writeFile(pdfPath, Buffer.from(cleanBase64, 'base64'));
 
     // Masked password to avoid exposing sensitive information in logs
     log(`🔐 Received password: [REDACTED]`);
@@ -130,7 +131,7 @@ app.post('/decrypt-base64', async (req, res) => {
       log(infoStdout || infoStderr);
 
       const decryptCmd = `qpdf --warning-exit-0 --password='${password}' --decrypt '${pdfPath}' '${tmpOutputPath}'`;
-      exec(decryptCmd, (err, stdout, stderr) => {
+      exec(decryptCmd, async (err, stdout, stderr) => {
         if (err && err.code !== 3) {
           const details = stderr || err.message;
           log(`❌ QPDF Decrypt Error (Base64 route): ${details}`);
@@ -139,7 +140,7 @@ app.post('/decrypt-base64', async (req, res) => {
         }
 
         log('✅ Decryption successful (Base64 route).');
-        const decryptedBase64 = fs.readFileSync(tmpOutputPath, { encoding: 'base64' });
+        const decryptedBase64 = await fsPromises.readFile(tmpOutputPath, { encoding: 'base64' });
         res.json({ success: true, decryptedBase64 });
         cleanup();
       });
