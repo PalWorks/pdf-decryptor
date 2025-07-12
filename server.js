@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const fs = require('fs');
 const fsPromises = fs.promises;
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
 const path = require('path');
 const os = require('os');
 const uploadsDir = os.tmpdir();
@@ -63,8 +63,8 @@ app.post('/decrypt', upload.single('file'), async (req, res) => {
     log(`🔧 Decryption target output path: ${tmpOutputPath}`);
 
     // Debug command to analyze PDF encryption
-    const infoCmd = `qpdf --show-encryption ${pdfPath}`;
-    exec(infoCmd, (infoErr, infoStdout, infoStderr) => {
+    const infoArgs = ['--show-encryption', pdfPath];
+    execFile('qpdf', infoArgs, (infoErr, infoStdout, infoStderr) => {
       log('🔍 PDF encryption info:');
       if (infoErr) {
         log(`Error checking encryption: ${infoErr.message}`);
@@ -72,8 +72,8 @@ app.post('/decrypt', upload.single('file'), async (req, res) => {
       log(infoStdout || infoStderr);
 
       // Actual decryption command
-      const decryptCmd = `qpdf --warning-exit-0 --password='${password}' --decrypt '${pdfPath}' '${tmpOutputPath}'`;
-      exec(decryptCmd, async (err, stdout, stderr) => {
+      const decryptArgs = ['--warning-exit-0', `--password=${password}`, '--decrypt', pdfPath, tmpOutputPath];
+      execFile('qpdf', decryptArgs, async (err, stdout, stderr) => {
         if (err && err.code !== 3) {
           const details = stderr || err.message;
           log(`❌ QPDF Error: ${details}`);
@@ -124,14 +124,14 @@ app.post('/decrypt-base64', async (req, res) => {
     log(`📄 Base64 PDF saved at: ${pdfPath}`);
     log(`🔧 Decryption output path: ${tmpOutputPath}`);
 
-    const infoCmd = `qpdf --show-encryption '${pdfPath}'`;
-    exec(infoCmd, (infoErr, infoStdout, infoStderr) => {
+    const infoArgs = ['--show-encryption', pdfPath];
+    execFile('qpdf', infoArgs, (infoErr, infoStdout, infoStderr) => {
       log('🔍 PDF encryption info (Base64 route):');
       if (infoErr) log(`Info Error: ${infoErr.message}`);
       log(infoStdout || infoStderr);
 
-      const decryptCmd = `qpdf --warning-exit-0 --password='${password}' --decrypt '${pdfPath}' '${tmpOutputPath}'`;
-      exec(decryptCmd, async (err, stdout, stderr) => {
+      const decryptArgs = ['--warning-exit-0', `--password=${password}`, '--decrypt', pdfPath, tmpOutputPath];
+      execFile('qpdf', decryptArgs, async (err, stdout, stderr) => {
         if (err && err.code !== 3) {
           const details = stderr || err.message;
           log(`❌ QPDF Decrypt Error (Base64 route): ${details}`);
