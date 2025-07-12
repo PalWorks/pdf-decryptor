@@ -8,7 +8,7 @@ This is a simple Express.js microservice that uses `qpdf` to decrypt password-pr
 
 - Accepts password-protected PDF files via `multipart/form-data`
 - Decrypts the file using the provided password
-- Returns the decrypted file as a direct download
+- Returns a JSON response with a `decryptedBase64` field
 - Lightweight and easy to deploy (Docker-ready)
 
 ---
@@ -64,7 +64,21 @@ POST /decrypt
 
 ### Response
 
-Returns the decrypted PDF as a file download.
+The server responds with JSON containing the decrypted file:
+
+```json
+{
+  "success": true,
+  "decryptedBase64": "<Base64 string>"
+}
+```
+
+You can convert `decryptedBase64` back into a PDF file:
+
+```js
+const fs = require('fs');
+fs.writeFileSync('decrypted.pdf', Buffer.from(decryptedBase64, 'base64'));
+```
 
 ---
 
