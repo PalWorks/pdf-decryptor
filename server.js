@@ -3,6 +3,8 @@ const multer = require('multer');
 const fs = require('fs');
 const { exec } = require('child_process');
 const path = require('path');
+const os = require('os');
+const uploadsDir = os.tmpdir();
 const app = express();
 const port = process.env.PORT || 10000;
 
@@ -12,7 +14,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Storage setup for multer
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
+  destination: (req, file, cb) => cb(null, uploadsDir),
   filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
 });
 const upload = multer({ storage });
@@ -35,11 +37,16 @@ app.post('/decrypt', upload.single('file'), async (req, res) => {
     let password = '';
     const tmpOutputPath = `/tmp/tmp-${Date.now()}.pdf`;
 
+    const cleanup = () => {
+      fs.unlink(pdfPath, () => {});
+      fs.unlink(tmpOutputPath, () => {});
+    };
+
     if (req.body.pdfBase64 && req.body.password) {
       log('📥 Base64 input received.');
       const base64Data = req.body.pdfBase64.replace(/^data:application\/pdf;base64,/, '');
       password = req.body.password;
-      pdfPath = `uploads/${Date.now()}.pdf`;
+      pdfPath = path.join(uploadsDir, `${Date.now()}.pdf`);
       fs.writeFileSync(pdfPath, Buffer.from(base64Data, 'base64'));
     } else if (req.file && req.body.password) {
       log('📥 Binary file received.');
@@ -68,6 +75,7 @@ app.post('/decrypt', upload.single('file'), async (req, res) => {
         if (err) {
           const details = stderr || err.message;
           log(`❌ QPDF Error: ${details}`);
+          cleanup();
           return res.status(500).json({
             error: 'Decryption failed',
             details
@@ -77,6 +85,7 @@ app.post('/decrypt', upload.single('file'), async (req, res) => {
         log('✅ Decryption successful.');
         const decryptedBase64 = fs.readFileSync(tmpOutputPath, { encoding: 'base64' });
         res.json({ success: true, decryptedBase64 });
+        cleanup();
       });
     });
   } catch (error) {
@@ -98,8 +107,13 @@ app.post('/decrypt-base64', async (req, res) => {
 
     log('📥 /decrypt-base64: Base64 input received.');
     const cleanBase64 = pdfBase64.replace(/^data:application\/pdf;base64,/, '');
-    const pdfPath = `uploads/${Date.now()}_base64input.pdf`;
+    const pdfPath = path.join(uploadsDir, `${Date.now()}_base64input.pdf`);
     const tmpOutputPath = `/tmp/tmp-${Date.now()}-base64-decrypted.pdf`;
+
+    const cleanup = () => {
+      fs.unlink(pdfPath, () => {});
+      fs.unlink(tmpOutputPath, () => {});
+    };
 
     fs.writeFileSync(pdfPath, Buffer.from(cleanBase64, 'base64'));
 
@@ -118,12 +132,14 @@ app.post('/decrypt-base64', async (req, res) => {
         if (err) {
           const details = stderr || err.message;
           log(`❌ QPDF Decrypt Error (Base64 route): ${details}`);
+          cleanup();
           return res.status(500).json({ error: 'Decryption failed', details });
         }
 
         log('✅ Decryption successful (Base64 route).');
         const decryptedBase64 = fs.readFileSync(tmpOutputPath, { encoding: 'base64' });
         res.json({ success: true, decryptedBase64 });
+        cleanup();
       });
     });
   } catch (error) {
