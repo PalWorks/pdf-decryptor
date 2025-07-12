@@ -154,6 +154,10 @@ app.post('/decrypt-base64', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  log(`🚀 Server is listening on port ${port}`);
-});
+if (require.main === module) {
+  app.listen(port, () => {
+    log(`🚀 Server is listening on port ${port}`);
+  });
+}
+
+module.exports = app;
