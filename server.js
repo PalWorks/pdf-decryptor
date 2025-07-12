@@ -56,7 +56,8 @@ app.post('/decrypt', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'Missing file or password' });
     }
 
-    log(`🔐 Received password: ${password}`);
+    // Masked password to avoid exposing sensitive information in logs
+    log(`🔐 Received password: [REDACTED]`);
     log(`📄 Uploaded file path: ${pdfPath}`);
     log(`🔧 Decryption target output path: ${tmpOutputPath}`);
 
@@ -117,7 +118,8 @@ app.post('/decrypt-base64', async (req, res) => {
 
     fs.writeFileSync(pdfPath, Buffer.from(cleanBase64, 'base64'));
 
-    log(`🔐 Received password: ${password}`);
+    // Masked password to avoid exposing sensitive information in logs
+    log(`🔐 Received password: [REDACTED]`);
     log(`📄 Base64 PDF saved at: ${pdfPath}`);
     log(`🔧 Decryption output path: ${tmpOutputPath}`);
 
